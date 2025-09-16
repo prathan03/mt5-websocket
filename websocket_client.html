@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MT5 WebSocket Client</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #1e1e1e;
+            color: #e0e0e0;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .controls {
+            margin-bottom: 20px;
+            padding: 20px;
+            background-color: #2d2d2d;
+            border-radius: 8px;
+        }
+        input, button, select {
+            margin: 5px;
+            padding: 8px 15px;
+            border-radius: 4px;
+            border: 1px solid #444;
+            background-color: #3a3a3a;
+            color: #e0e0e0;
+        }
+        button {
+            cursor: pointer;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button:disabled {
+            background-color: #666;
+            cursor: not-allowed;
+        }
+        .tick-display {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .tick-card {
+            background-color: #2d2d2d;
+            border-radius: 8px;
+            padding: 15px;
+            border: 1px solid #444;
+        }
+        .symbol-name {
+            font-size: 18px;
+            font-weight: bold;
+            color: #4CAF50;
+            margin-bottom: 10px;
+        }
+        .tick-data {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+        .tick-item {
+            font-size: 14px;
+        }
+        .bid { color: #ef5350; }
+        .ask { color: #66bb6a; }
+        .spread { color: #ffa726; }
+        .status {
+            padding: 10px;
+            margin-top: 10px;
+            border-radius: 4px;
+            background-color: #2d2d2d;
+        }
+        .connected { background-color: #1b5e20; }
+        .disconnected { background-color: #b71c1c; }
+        #log {
+            background-color: #1e1e1e;
+            border: 1px solid #444;
+            padding: 10px;
+            margin-top: 20px;
+            height: 200px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>MT5 Real-Time Tick Data WebSocket Client</h1>
+
+        <div class="controls">
+            <div>
+                <input type="text" id="wsUrl" placeholder="WebSocket URL" value="ws://localhost:8765">
+                <button id="connectBtn" onclick="toggleConnection()">Connect</button>
+            </div>
+            <div>
+                <select id="symbolSelect">
+                    <option value="EURUSD">EURUSD</option>
+                    <option value="GBPUSD">GBPUSD</option>
+                    <option value="USDJPY">USDJPY</option>
+                    <option value="GOLD">GOLD</option>
+                    <option value="BTCUSD">BTCUSD</option>
+                </select>
+                <button id="subscribeBtn" onclick="subscribe()" disabled>Subscribe</button>
+                <button id="unsubscribeBtn" onclick="unsubscribe()" disabled>Unsubscribe</button>
+            </div>
+            <div class="status" id="status">
+                Status: <span id="statusText">Disconnected</span>
+            </div>
+        </div>
+
+        <div class="tick-display" id="tickDisplay"></div>
+
+        <div>
+            <h3>Log</h3>
+            <div id="log"></div>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        let subscriptions = new Map();
+        let reconnectAttempts = 0;
+        let maxReconnectAttempts = 5;
+
+        function log(message) {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            logDiv.innerHTML += `[${timestamp}] ${message}<br>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function updateStatus(connected) {
+            const statusText = document.getElementById('statusText');
+            const status = document.getElementById('status');
+            const connectBtn = document.getElementById('connectBtn');
+            const subscribeBtn = document.getElementById('subscribeBtn');
+            const unsubscribeBtn = document.getElementById('unsubscribeBtn');
+
+            if (connected) {
+                statusText.textContent = 'Connected';
+                status.className = 'status connected';
+                connectBtn.textContent = 'Disconnect';
+                subscribeBtn.disabled = false;
+                unsubscribeBtn.disabled = false;
+            } else {
+                statusText.textContent = 'Disconnected';
+                status.className = 'status disconnected';
+                connectBtn.textContent = 'Connect';
+                subscribeBtn.disabled = true;
+                unsubscribeBtn.disabled = true;
+            }
+        }
+
+        function connect() {
+            const url = document.getElementById('wsUrl').value;
+
+            try {
+                ws = new WebSocket(url);
+
+                ws.onopen = function() {
+                    log('Connected to WebSocket server');
+                    updateStatus(true);
+                    reconnectAttempts = 0;
+
+                    // Send ping every 30 seconds
+                    setInterval(() => {
+                        if (ws && ws.readyState === WebSocket.OPEN) {
+                            ws.send(JSON.stringify({ type: 'ping' }));
+                        }
+                    }, 30000);
+                };
+
+                ws.onmessage = function(event) {
+                    try {
+                        const data = JSON.parse(event.data);
+                        handleMessage(data);
+                    } catch (e) {
+                        log('Error parsing message: ' + e.message);
+                    }
+                };
+
+                ws.onclose = function() {
+                    log('Disconnected from WebSocket server');
+                    updateStatus(false);
+                    subscriptions.clear();
+                    document.getElementById('tickDisplay').innerHTML = '';
+
+                    // Auto-reconnect
+                    if (reconnectAttempts < maxReconnectAttempts) {
+                        reconnectAttempts++;
+                        log(`Attempting to reconnect... (${reconnectAttempts}/${maxReconnectAttempts})`);
+                        setTimeout(connect, 3000);
+                    }
+                };
+
+                ws.onerror = function(error) {
+                    log('WebSocket error: ' + error);
+                };
+
+            } catch (e) {
+                log('Failed to connect: ' + e.message);
+            }
+        }
+
+        function disconnect() {
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+            reconnectAttempts = maxReconnectAttempts; // Prevent auto-reconnect
+        }
+
+        function toggleConnection() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                disconnect();
+            } else {
+                connect();
+            }
+        }
+
+        function subscribe() {
+            const symbol = document.getElementById('symbolSelect').value;
+
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'subscribe',
+                    symbol: symbol
+                }));
+                log(`Subscribing to ${symbol}`);
+            }
+        }
+
+        function unsubscribe() {
+            const symbol = document.getElementById('symbolSelect').value;
+
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'unsubscribe',
+                    symbol: symbol
+                }));
+                log(`Unsubscribing from ${symbol}`);
+
+                // Remove from display
+                subscriptions.delete(symbol);
+                const card = document.getElementById(`tick-${symbol}`);
+                if (card) {
+                    card.remove();
+                }
+            }
+        }
+
+        function handleMessage(data) {
+            switch(data.type) {
+                case 'connection':
+                    log(`Server: ${data.message}`);
+                    break;
+
+                case 'subscription':
+                    log(`${data.symbol}: ${data.status}`);
+                    if (data.status === 'subscribed') {
+                        subscriptions.set(data.symbol, true);
+                    }
+                    break;
+
+                case 'tick':
+                    updateTickDisplay(data.data);
+                    break;
+
+                case 'error':
+                    log(`Error: ${data.message}`);
+                    break;
+
+                case 'pong':
+                    // Heartbeat response
+                    break;
+
+                default:
+                    log(`Unknown message type: ${data.type}`);
+            }
+        }
+
+        function updateTickDisplay(tickData) {
+            const symbol = tickData.symbol;
+            let card = document.getElementById(`tick-${symbol}`);
+
+            if (!card) {
+                // Create new card
+                card = document.createElement('div');
+                card.id = `tick-${symbol}`;
+                card.className = 'tick-card';
+                document.getElementById('tickDisplay').appendChild(card);
+            }
+
+            // Update card content
+            card.innerHTML = `
+                <div class="symbol-name">${symbol}</div>
+                <div class="tick-data">
+                    <div class="tick-item bid">Bid: ${tickData.bid.toFixed(5)}</div>
+                    <div class="tick-item ask">Ask: ${tickData.ask.toFixed(5)}</div>
+                    <div class="tick-item">Last: ${tickData.last.toFixed(5)}</div>
+                    <div class="tick-item spread">Spread: ${tickData.spread} pips</div>
+                    <div class="tick-item">Volume: ${tickData.volume}</div>
+                    <div class="tick-item">Time: ${new Date(tickData.time).toLocaleTimeString()}</div>
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html>

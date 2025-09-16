@@ -123,6 +123,10 @@ order = requests.post('http://localhost:8000/order', json={
 ### 3. MCP Server (AI Agent Integration)
 
 ```bash
+# ใช้ standalone version (ไม่ต้องติดตั้ง mcp package)
+python mcp_server_standalone.py
+
+# หรือถ้าติดตั้ง mcp package แล้ว
 python mcp_server.py
 ```
 

@@ -61,10 +61,7 @@ class ConnectionManager:
 manager = ConnectionManager()
 
 # Pydantic models
-class LoginRequest(BaseModel):
-    login: int
-    password: str
-    server: str
+class ConnectRequest(BaseModel):
     path: Optional[str] = None
 
 class OrderRequest(BaseModel):
@@ -94,20 +91,16 @@ async def root():
     return {"message": "MT5 Trading API", "status": "online"}
 
 @app.post("/connect")
-async def connect(request: LoginRequest):
-    """Connect to MT5 terminal"""
-    success = mt5_handler.connect(
-        request.login,
-        request.password,
-        request.server,
-        request.path
-    )
+async def connect(request: ConnectRequest = None):
+    """Connect to MT5 terminal (uses already logged in terminal)"""
+    path = request.path if request else None
+    success = mt5_handler.connect(path)
     if success:
         return {
             "status": "connected",
             "account": mt5_handler.get_account_info()
         }
-    raise HTTPException(status_code=400, detail="Connection failed")
+    raise HTTPException(status_code=400, detail="Connection failed. Please make sure MT5 is running and logged in.")
 
 @app.post("/disconnect")
 async def disconnect():

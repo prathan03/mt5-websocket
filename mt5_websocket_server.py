@@ -31,21 +31,25 @@ class MT5WebSocketServer:
         self.running = False
         self.mt5_connected = False
 
-    def initialize_mt5(self, login=None, password=None, server=None):
-        """Initialize MT5 connection"""
-        if not mt5.initialize():
-            logger.error("MT5 initialization failed")
-            return False
-
-        if login and password and server:
-            authorized = mt5.login(login, password=password, server=server)
-            if not authorized:
-                logger.error(f"Failed to login to MT5: {mt5.last_error()}")
-                mt5.shutdown()
+    def initialize_mt5(self, path=None):
+        """Initialize MT5 connection (uses already logged in terminal)"""
+        if path:
+            if not mt5.initialize(path):
+                logger.error(f"MT5 initialization failed: {mt5.last_error()}")
+                return False
+        else:
+            if not mt5.initialize():
+                logger.error(f"MT5 initialization failed: {mt5.last_error()}")
                 return False
 
+        account_info = mt5.account_info()
+        if account_info is None:
+            logger.error("No account connected in MT5 terminal. Please login to MT5 first.")
+            mt5.shutdown()
+            return False
+
         self.mt5_connected = True
-        logger.info("MT5 connected successfully")
+        logger.info(f"MT5 connected successfully - Account: {account_info.login}")
         return True
 
     async def register_client(self, websocket):
@@ -243,7 +247,7 @@ class MT5WebSocketServer:
 if __name__ == "__main__":
     server = MT5WebSocketServer(host='0.0.0.0', port=8765)
 
-    # Initialize MT5 (add your credentials)
+    # Initialize MT5 (uses already logged in terminal)
     if server.initialize_mt5():
         try:
             asyncio.run(server.start_server())
@@ -252,4 +256,4 @@ if __name__ == "__main__":
         finally:
             server.stop()
     else:
-        logger.error("Failed to initialize MT5")
+        logger.error("Failed to initialize MT5. Please make sure MT5 terminal is running and logged in.")

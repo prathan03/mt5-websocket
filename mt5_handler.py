@@ -13,8 +13,8 @@ class MT5Handler:
         self.connected = False
         self.account_info = None
 
-    def connect(self, login: int, password: str, server: str, path: str = None) -> bool:
-        """Connect to MT5 terminal"""
+    def connect(self, path: str = None) -> bool:
+        """Connect to MT5 terminal (uses already logged in terminal)"""
         try:
             if path:
                 if not mt5.initialize(path):
@@ -25,15 +25,14 @@ class MT5Handler:
                     logger.error(f"MT5 initialization failed: {mt5.last_error()}")
                     return False
 
-            authorized = mt5.login(login, password=password, server=server)
-            if not authorized:
-                logger.error(f"Login failed: {mt5.last_error()}")
+            self.account_info = mt5.account_info()
+            if self.account_info is None:
+                logger.error("No account connected in MT5 terminal. Please login to MT5 first.")
                 mt5.shutdown()
                 return False
 
             self.connected = True
-            self.account_info = mt5.account_info()
-            logger.info(f"Connected to MT5 - Account: {login}, Server: {server}")
+            logger.info(f"Connected to MT5 - Account: {self.account_info.login}, Server: {self.account_info.server}")
             return True
 
         except Exception as e:

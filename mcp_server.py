@@ -23,12 +23,12 @@ class MT5MCPServer:
         """Setup MCP tools for MT5 operations"""
 
         @self.server.tool()
-        async def connect_mt5(login: int, password: str, server: str, path: Optional[str] = None) -> Dict[str, Any]:
-            """Connect to MT5 trading terminal"""
-            success = self.mt5_handler.connect(login, password, server, path)
+        async def connect_mt5(path: Optional[str] = None) -> Dict[str, Any]:
+            """Connect to MT5 trading terminal (uses already logged in terminal)"""
+            success = self.mt5_handler.connect(path)
             if success:
                 return {"status": "connected", "account": self.mt5_handler.get_account_info()}
-            return {"status": "failed", "error": "Connection failed"}
+            return {"status": "failed", "error": "Connection failed. Please make sure MT5 is running and logged in."}
 
         @self.server.tool()
         async def disconnect_mt5() -> Dict[str, Any]:

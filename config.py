@@ -1,13 +1,7 @@
 import os
-from dotenv import load_dotenv
-
-load_dotenv()
 
 class Config:
-    # MT5 Settings
-    MT5_LOGIN = int(os.getenv('MT5_LOGIN', '0'))
-    MT5_PASSWORD = os.getenv('MT5_PASSWORD', '')
-    MT5_SERVER = os.getenv('MT5_SERVER', '')
+    # MT5 Settings (optional path for Windows)
     MT5_PATH = os.getenv('MT5_PATH', None)
 
     # API Server Settings
@@ -33,10 +27,6 @@ class Config:
     @classmethod
     def validate(cls):
         """Validate configuration"""
-        if cls.MT5_LOGIN == 0:
-            raise ValueError("MT5_LOGIN not configured")
-        if not cls.MT5_PASSWORD:
-            raise ValueError("MT5_PASSWORD not configured")
-        if not cls.MT5_SERVER:
-            raise ValueError("MT5_SERVER not configured")
+        # No validation needed for MT5 connection
+        # as we use the already logged in terminal
         return True

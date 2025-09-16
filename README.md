@@ -33,10 +33,8 @@ cp .env.example .env
 ## Configuration (.env)
 
 ```env
-# MT5 Credentials
-MT5_LOGIN=YOUR_MT5_LOGIN
-MT5_PASSWORD=YOUR_MT5_PASSWORD
-MT5_SERVER=YOUR_BROKER_SERVER
+# MT5 Path (Optional - for Windows only)
+# MT5_PATH=C:/Program Files/MetaTrader 5/terminal64.exe
 
 # Server Settings
 API_HOST=0.0.0.0
@@ -44,6 +42,8 @@ API_PORT=8000
 WS_HOST=0.0.0.0
 WS_PORT=8765
 ```
+
+**หมายเหตุ:** ไม่ต้องใส่ username/password - ใช้ MT5 Terminal ที่ login อยู่แล้ว
 
 ## Usage
 
@@ -103,12 +103,8 @@ API จะทำงานที่ http://localhost:8000
 ```python
 import requests
 
-# Connect to MT5
-response = requests.post('http://localhost:8000/connect', json={
-    'login': 123456,
-    'password': 'your_password',
-    'server': 'ICMarkets-Demo'
-})
+# Connect to MT5 (uses already logged in terminal)
+response = requests.post('http://localhost:8000/connect')
 
 # Get tick data
 tick = requests.get('http://localhost:8000/tick/EURUSD').json()
@@ -196,8 +192,9 @@ MT5Bot/
 
 ## Notes
 
-- ต้องเปิด MT5 Terminal ก่อนรัน server
-- สำหรับ Windows: ระบุ path ของ terminal64.exe ใน .env
+- **ต้องเปิด MT5 Terminal และ login ก่อนรัน server**
+- ไม่ต้องใส่ username/password ในโค้ด - ใช้ terminal ที่ login อยู่แล้ว
+- สำหรับ Windows: อาจต้องระบุ path ของ terminal64.exe ใน .env (optional)
 - สำหรับ Mac/Linux: ติดตั้ง MT5 ผ่าน Wine
 - WebSocket จะส่ง tick data ทุกครั้งที่มีการเปลี่ยนแปลง bid/ask
 

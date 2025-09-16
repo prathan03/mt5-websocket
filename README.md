@@ -37,7 +37,6 @@ cp .env.example .env
 MT5_LOGIN=YOUR_MT5_LOGIN
 MT5_PASSWORD=YOUR_MT5_PASSWORD
 MT5_SERVER=YOUR_BROKER_SERVER
-MT5_PATH=/path/to/terminal64.exe  # Optional for Windows
 
 # Server Settings
 API_HOST=0.0.0.0
